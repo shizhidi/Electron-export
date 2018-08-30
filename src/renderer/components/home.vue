@@ -53,7 +53,7 @@
         </div>
         </el-col>
         <el-col :span="5">
-        <el-button type="primary" @click="testMysql">数据库连接测试</el-button>
+        <el-button type="primary" @click="testMysql">数据库连接</el-button>
         </el-col>
     </el-row>
 
@@ -185,36 +185,47 @@ export default {
     // this.startTime = this.endTime = new Date(new Date().toLocaleDateString()).getTime()
   },
   mounted () {
-    debugger
-    let that = this
-    this.$mysql.Navigate.getAllNavigate().then(function (res) {
-      res.forEach(function (item, index, array) {
-        that.tissues.push({
-          value: item.t_id,
-          label: item.t_name
-        })
-      })
-    }, function () {
-      // 错误日志d
-    })
-
-    this.$mysql.Version.getAllVersions().then(function (res) {
-      debugger
-      if (that.$lodash.isArray(res)) {
-        that.versions = res
-      }
-    }, function (errStr) {
-      that.$message.error('数据获取错误:' + errStr)
-    })
+    this.getTreeVersions();
   },
   methods: {
     handleChange (value) {
       console.log(value)
     },
+    getTreeVersions () {
+      let that = this
+      that.tissues = [];
+      this.machines = [];
+      this.$mysql.Navigate.getAllNavigate().then(function (res) {
+        res.forEach(function (item, index, array) {
+          that.tissues.push({
+            value: item.t_id,
+            label: item.t_name
+          })
+        })
+      }, function () {
+        // 错误日志d
+      })
+
+      this.$mysql.Version.getAllVersions().then(function (res) {
+        debugger
+        if (that.$lodash.isArray(res)) {
+          that.versions = res
+        }
+      }, function (errStr) {
+        that.$message.error('数据获取错误:' + errStr)
+      })
+    },
     tissueClick () {
 
     },
     testMysql () {
+      // 数据库重新连接刷新组织树
+      this.$mysqlUtil.DAU = null;
+      this.$mysqlUtil.CONFIG = null;
+      this.$mysqlUtil.OPTIONS.host = this.address;
+      this.$mysqlUtil.OPTIONS.user = this.username;
+      this.$mysqlUtil.OPTIONS.password = this.password;
+      this.$mysqlUtil.CREATEPOOL();
       this.$mysqlUtil.TESTMYSQL(this.address,this.username, this.password,(err) => {
         if (err){
           this.$message({
@@ -226,6 +237,7 @@ export default {
             message: '数据库连接成功!',
             type: 'success'
           })
+          this.getTreeVersions();
         }
       })
     },
@@ -273,7 +285,7 @@ export default {
     exportConfigData () {
       debugger
       var that = this
-
+      this.$util.createDir(this.selectedDrive + this.savePath)
       if (!this.selectedTissue) {
         this.$message.error('没有选择风场!')
         return
@@ -295,6 +307,8 @@ export default {
         })
         loading.close()
       }).catch(function(err){
+        debugger
+        // that.$util.toGBK(err.message)
         that.$message({
           message: '配置导出失败!',
           type: 'error',
@@ -307,6 +321,7 @@ export default {
     importConfigData () {
       debugger
       var that = this
+      this.$util.createDir(this.selectedDrive + this.savePath)
       const loading = this.$loading({
         lock: true,
         text: '数据导出中...',
@@ -401,6 +416,7 @@ export default {
     exportData () {
       debugger
       let that = this, calcNum = 0, result = false
+      this.$util.createDir(this.selectedDrive + this.savePath)
       const bool = this.checkMysql();
       if (!bool) return;
 
@@ -520,6 +536,7 @@ export default {
     importData () {
       debugger
       var that = this
+      this.$util.createDir(this.selectedDrive + this.savePath)
       const loading = this.loadingMsg()
       this.fliterFiles(this.selectedDrive + this.savePath,2).then(function(files){
         that.$mysql.Export.ImportAllData(that.username, that.password, that.address, that.selectedDrive + that.savePath,files).then(function(res){

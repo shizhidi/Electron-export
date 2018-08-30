@@ -83,9 +83,7 @@ export default{
     }
   },
   created () {
-    if (!this.$fs.existsSync('D:/exportTest')) {
-      this.$fs.mkdir('D:/exportTest')
-    }
+    this.$util.createDir()
   },
   mounted () {
     this.$vCode.vCode(document.getElementById('vCode1'))
