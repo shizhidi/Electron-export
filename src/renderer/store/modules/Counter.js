@@ -1,13 +1,14 @@
 const state = {
-  main: 0
+  selectedTissue: 0,
+  machines: []
 }
 
 const mutations = {
-  DECREMENT_MAIN_COUNTER (state) {
-    state.main--
+  setSelectedTissue (treeid) {
+    state.selectedTissue = treeid
   },
-  INCREMENT_MAIN_COUNTER (state) {
-    state.main++
+  setMachines (machines) {
+    state.machines = machines
   }
 }
 

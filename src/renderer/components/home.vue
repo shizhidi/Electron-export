@@ -69,7 +69,7 @@
     </el-row>
 
     <el-row :gutter="0" class="mL15">
-      <el-col :span="24">
+      <el-col :span="11">
         路径：
         选择盘符：
         <el-select v-model="selectedDrive" @change="driveChange" filterable placeholder="请选择">
@@ -81,14 +81,29 @@
           </el-option>
         </el-select>
         <el-input v-model="savePath" name="path" placeholder=""></el-input>
+      </el-col>
+      <el-col :span="3">
+        <div>
+          <!-- <el-checkbox v-model="checked" label="创建表" border></el-checkbox> -->
+          <el-button type="primary" @click="createTables">导出数据</el-button>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div class="block">
+          <span class="demonstration">导入的组织树ID</span>
+          <el-input v-model="exportTreeId" name="path" placeholder=""></el-input>
+        </div>
+        </el-col>
+    </el-row>
+
+    <el-row :gutter="0" class="mL15">
+      <el-col :span="24">
         <el-button type="primary" @click="exportData">导出数据</el-button>
         <el-button type="primary" @click="importData">导入数据</el-button>
         <el-button type="primary" @click="exportConfigData">导出配置</el-button>
         <el-button type="primary" @click="importConfigData">导入配置</el-button>
-        <!-- <el-button type="primary" @click="stopData">取消</el-button> -->
-      </el-col>
-      <el-col :span="0">
-
+        <el-button type="primary" @click="exportCircleData">导出刚度圆数据</el-button>
+        <el-button type="primary" @click="importCircleData">导入刚度圆数据</el-button>
       </el-col>
     </el-row>
 
@@ -142,6 +157,8 @@ export default {
       username: 'root',
       password: 'test',
       address: '127.0.0.1',
+      checked: false,
+      exportTreeId: 0,
       drives: [{
         label: 'C:/',
         value: 'C:/'
@@ -186,6 +203,11 @@ export default {
   },
   mounted () {
     this.getTreeVersions();
+  },
+  computed() {
+    this.handlestartTime = new Date(this.startTime).getTime()
+    this.handleendTime = new Date(this.endTime).getTime() + 24 * 60 * 60 * 1000
+    this.handlepath = this.selectedDrive + this.savePath
   },
   methods: {
     handleChange (value) {
@@ -285,7 +307,7 @@ export default {
     exportConfigData () {
       debugger
       var that = this
-      this.$util.createDir(this.selectedDrive + this.savePath)
+      this.$util.createDir(this.handlepath)
       if (!this.selectedTissue) {
         this.$message.error('没有选择风场!')
         return
@@ -298,7 +320,7 @@ export default {
         background: 'rgba(144,144,144, 0.6)'
       })
 
-      that.$mysql.Export.exportConfigDbData(this.username, this.password, this.address, this.selectedTissue, this.selectedDrive + this.savePath).then(function(datas){
+      that.$mysql.Export.exportConfigDbData(this.username, this.password, this.address, this.selectedTissue, this.handlepath).then(function(datas){
         that.$message({
           message: '配置导出成功!',
           type: 'success',
@@ -306,6 +328,8 @@ export default {
           duration: 0
         })
         loading.close()
+        that.exportTreeId = that.selectedTissue
+        that.$store.commit('setSelectedTissue',that.selectedTissue)
       }).catch(function(err){
         debugger
         // that.$util.toGBK(err.message)
@@ -321,17 +345,23 @@ export default {
     importConfigData () {
       debugger
       var that = this
-      this.$util.createDir(this.selectedDrive + this.savePath)
+      this.$util.createDir(this.handlepath)
+      if (this.exportTreeId == 0) {
+        this.$message.error('没有填写要导入的组织树ID!')
+        return
+      }
+
       const loading = this.$loading({
         lock: true,
         text: '数据导出中...',
         spinner: 'el-icon-loading',
         background: 'rgba(144,144,144, 0.6)'
       })
+
       //检查该路径下是否有配置文件
-      this.fliterFiles(this.selectedDrive + this.savePath,1).then(function(files){
+      this.fliterFiles(this.handlepath,1).then(function(files){
         if (files.length === 5) {
-          that.$mysql.Export.ImportConfigDbData(that.username, that.password, that.address, that.selectedDrive + that.savePath).then(function (values) {
+          that.$mysql.Export.ImportConfigDbData(that.username, that.password, that.address,that.handlepath).then(function (values) {
             that.$message({
               message: '配置导入成功!',
               type: 'success',
@@ -339,6 +369,19 @@ export default {
               duration: 0
             })
             loading.close()
+            debugger
+            //导入成功修改组织树的父级
+            let selectedTissue = !that.selectedTissue ? 0 : that.selectedTissue;
+            that.$mysql.Navigate.updateNavigateParentId(that.exportTreeId,selectedTissue).then(function(){
+
+            }).catch(function (err) {
+              that.$message({
+                message: '填写的组织树ID不存在数据库中!',
+                type: 'error',
+                showClose: true,
+                duration: 0
+              })
+            })
           }).catch(function () {
             that.$message({
               message: '配置导入失败!',
@@ -350,7 +393,7 @@ export default {
           })
         }else{
           that.$message({
-            message: '配置表缺失!',
+            message: '配置sql文件缺失!',
             type: 'error',
             showClose: true,
             duration: 0
@@ -388,6 +431,8 @@ export default {
     fliterFiles (path,type) {
       debugger
       const configTables = ['c_machine.sql','c_machine_position.sql','c_machine_dau6000.sql','c_dau6000.sql','c_navigate_tree.sql']
+      const dau8000 = ['inclin.sql']
+      const dauCircle = ['circle.sql']
       return new Promise((resolve, reject) => {
         this.$fs.readdir(path, function (err, files) {
           if (err) {
@@ -408,6 +453,13 @@ export default {
                 return true
               }
             }
+            if (type == 3) {
+              if (dauCircle.indexOf(file) != -1) {
+                return true
+              }else{
+                return false
+              }
+            }
           })
           resolve(tempFiles)
         })
@@ -416,20 +468,13 @@ export default {
     exportData () {
       debugger
       let that = this, calcNum = 0, result = false
-      this.$util.createDir(this.selectedDrive + this.savePath)
+      this.$util.createDir(this.handlepath)
       const bool = this.checkMysql();
       if (!bool) return;
-
-      const loading = this.loadingMsg()
 
       let stTime = new Date(this.startTime).getTime(), edTime = new Date(this.endTime).getTime()
       if (stTime > edTime) {
         this.$message.error('开始时间不能大于结束时间!')
-        return
-      }
-
-      if (this.startSpeed > this.endSpeed) {
-        this.$message.error('最小转速不能大于最大转速!')
         return
       }
 
@@ -438,15 +483,14 @@ export default {
         return
       }
 
+      const loading = this.loadingMsg()
+
       console.log(this.checkedMachines)
       // TODO 把配置传送到后台
-      let startTime = new Date(this.startTime).getTime()
-      let endTime = new Date(this.endTime).getTime() + 24 * 60 * 60 * 1000
-      let path = this.selectedDrive + this.savePath
 
       if (this.checkedVersions.length === 2) {
         let data6000 = new Promise((resolve, reject) => {
-          this.$mysql.Export.exportDataOne6000Tool(this.username, this.password, this.address, this.checkedMachines, path, startTime, endTime).then(function (values) {
+          this.$mysql.Export.exportDataOne6000Tool(this.username, this.password, this.address, this.checkedMachines, this.handlepath, this.handlestartTime, this.handleendTime).then(function (values) {
             resolve(values)
           }).catch(function () {
             reject(false)
@@ -454,7 +498,7 @@ export default {
         })
 
         let data8000 = new Promise((resolve, reject) => {
-          this.$mysql.Export.exportDataOne8000Tool(this.username, this.password, this.address, this.checkedMachines, path, startTime, endTime).then(function (values) {
+          this.$mysql.Export.exportDataOne8000Tool(this.username, this.password, this.address, this.checkedMachines, this.handlepath, startTime, endTime).then(function (values) {
             resolve(values)
           }).catch(function () {
             reject(false)
@@ -484,7 +528,7 @@ export default {
       }
 
       if (this.checkedVersions.length === 1 && this.checkedVersions[0] == 1) {
-        this.$mysql.Export.exportDataOne6000Tool(this.username, this.password, this.address, this.checkedMachines, path, startTime, endTime).then(function (values) {
+        this.$mysql.Export.exportDataOne6000Tool(this.username, this.password, this.address, this.checkedMachines, this.handlepath, startTime, endTime).then(function (values) {
           that.$message({
             message: '数据导出成功!',
             type: 'success',
@@ -504,7 +548,7 @@ export default {
       }
 
       if (this.checkedVersions.length === 1 && this.checkedVersions[0] == 2) {
-        this.$mysql.Export.exportDataOne8000Tool(this.username, this.password, this.address, this.checkedMachines, path, startTime, endTime).then(function (values) {
+        this.$mysql.Export.exportDataOne8000Tool(this.username, this.password, this.address, this.checkedMachines, this.handlepath, startTime, endTime).then(function (values) {
           that.$message({
             message: '数据导出成功!',
             type: 'success',
@@ -533,13 +577,37 @@ export default {
       })
       return loading
     },
+    createTables() {
+      if (this.checkedMachines.length != 0) {
+        this.$mysql.Machine.createMachineDauTables(this.checkedMachines).then(function(res){
+          that.$message({
+            message: '数据表创建成功!',
+            type: 'success',
+            showClose: true,
+            duration: 0
+          })
+        }).catch(function(err){
+          that.$message({
+            message: '数据表创建失败!',
+            type: 'error',
+            showClose: true,
+            duration: 0
+          })
+        })
+      }else{
+        that.$message({
+          message: '选择机组号!',
+          type: 'error'
+        })
+      }
+    },
     importData () {
       debugger
       var that = this
-      this.$util.createDir(this.selectedDrive + this.savePath)
+      this.$util.createDir(this.handlepath)
       const loading = this.loadingMsg()
-      this.fliterFiles(this.selectedDrive + this.savePath,2).then(function(files){
-        that.$mysql.Export.ImportAllData(that.username, that.password, that.address, that.selectedDrive + that.savePath,files).then(function(res){
+      this.fliterFiles(this.handlepath,2).then(function(files){
+        that.$mysql.Export.ImportAllData(that.username, that.password, that.address, that.checkedMachines, that.handlepath,files).then(function(res){
           that.$message({
             message: '数据导入成功!',
             type: 'success',
@@ -561,6 +629,69 @@ export default {
         loading.close()
       })
       // this.getCurrentStatus('导入');
+    },
+    exportCircleData () {
+      let that = this, calcNum = 0, result = false
+      this.$util.createDir(this.handlepath)
+      const bool = this.checkMysql();
+      if (!bool) return;
+
+      let stTime = new Date(this.startTime).getTime(), edTime = new Date(this.endTime).getTime()
+      if (stTime > edTime) {
+        this.$message.error('开始时间不能大于结束时间!')
+        return
+      }
+
+      if (this.checkedMachines.length == 0) {
+        this.$message.error('未选取机组!')
+        return
+      }
+
+      const loading = this.loadingMsg()
+      this.$mysql.Export.exportCircleData(this.username, this.password, this.address, this.checkedMachines, this.handlepath, startTime, endTime).then(function(){
+          that.$message({
+            message: '刚度圆配置导出成功!',
+            type: 'success',
+            showClose: true,
+            duration: 0
+          })
+          loading.close()
+      }).catch(function(err){
+          that.$message({
+            message: '刚度圆配置导出失败!',
+            type: 'error',
+            showClose: true,
+            duration: 0
+          })
+          loading.close()
+      })
+    },
+    importCircleData () {
+      var that = this
+      this.$util.createDir(this.handlepath)
+      const loading = this.loadingMsg()
+      this.fliterFiles(this.handlepath,3).then(function(files){
+        that.$mysql.Export.importCircleData(that.username, that.password, that.address, that.checkedMachines, that.handlepath,files).then(function(res){
+          that.$message({
+            message: '刚度圆配置导入成功!',
+            type: 'success',
+            showClose: true,
+            duration: 0
+          })
+          loading.close()
+        }).catch(function(err){
+          that.$message({
+            message: '刚度圆配置导入失败!',
+            type: 'error',
+            showClose: true,
+            duration: 0
+          })
+          loading.close()
+        })
+      }).catch(function(err){
+        throw new Error(err)
+        loading.close()
+      })
     },
     getCurrentStatus (str) {
       let that = this

@@ -18,7 +18,7 @@
             <el-row>
               <el-col :span="14">
                 <el-form-item label="验证码" prop="VCode">
-                  <el-input type="password" class="code" v-model="ruleForm.VCode" auto-complete="off"></el-input>
+                  <el-input type="password" class="code" v-model="ruleForm.VCode" @keyup.enter.native="loginForm" auto-complete="off"></el-input>
 
                 </el-form-item>
               </el-col>
@@ -28,8 +28,8 @@
             </el-row>
             <el-form-item >
               <div class="loginButton">
-                <el-button type="primary" @click="loginForm('ruleForm')" >登陆</el-button>
-                <el-button type="primary" @click="resetForm('ruleForm')">重置</el-button>
+                <el-button type="primary" @click="loginForm()" >登陆</el-button>
+                <el-button type="primary" @click="resetForm()">重置</el-button>
               </div>
             </el-form-item>
           </el-form>
@@ -89,10 +89,10 @@ export default{
     this.$vCode.vCode(document.getElementById('vCode1'))
   },
   methods: {
-    loginForm (formName) {
+    loginForm () {
       debugger
       let that = this
-      this.$refs[formName].validate((valid) => {
+      this.$refs["ruleForm"].validate((valid) => {
         if (valid) {
           that.$mysql.User.login(that.ruleForm.name, that.ruleForm.pass).then(function (res) {
             if (res) {

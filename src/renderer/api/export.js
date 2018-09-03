@@ -95,7 +95,28 @@ const EXPORT = {
 
     return Promise.all(arrs)
   },
-  async ImportAllData (username, password, address, savePath, files) {
+  async exportCircleData (username, password, address, checkedMachines, path, startTime, endTime) {
+    const TableName = ['circle']
+    let arrs = []
+    checkedMachines.forEach(function (machineid) {
+      TableName.forEach(function (tableName, index) {
+        let shellstr = `mysqldump -u${username} -p${password} -h ${address}  --no-create-info --default-character-set=utf8 dau6000_1_2014 d_${machineid}_${tableName} --where="saveTime_Com BETWEEN ${startTime} and ${endTime}" > ${path}\\${machineid}_${tableName}.sql`
+        arrs.push(cmdPromise(shellstr))
+      })
+    })
+
+    return Promise.all(arrs)
+  },
+  async importCircleData (username, password, address, checkedMachines, savePath, files) {
+    let arrs = []
+    const head = `mysql -u${username} -p${password} -h ${address} --default-character-set=utf8 dau6000_1_2014 < ${savePath}\\`
+    files.forEach(function (file) {
+      let Sql = `${head}${file}`
+      arrs.push(cmdPromise(Sql))
+    })
+    return Promise.all(arrs)
+  },
+  async ImportAllData (username, password, address, checkedMachines, savePath, files) {
     debugger
     let arrs = []
     const head = `mysql -u${username} -p${password} -h ${address} --default-character-set=utf8 dau6000_1_2014 < ${savePath}\\`
