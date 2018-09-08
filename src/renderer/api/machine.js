@@ -7,6 +7,7 @@ const MACHINE = {
     return Promise
   },
   async createMachineDauTables (machines) {
+    debugger
     let resMachines = []
     machines.forEach(function (machineid) {
       let Promise = mysqlPool.EXECUTE(mysqlPool.DAU, `call createtables(${machineid})`)
